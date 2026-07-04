@@ -5,163 +5,174 @@ import threading
 import logging
 import shutil
 import random
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, send_from_directory
 from flask_cors import CORS
-from utils.text_processor import process_text
-from utils.image_generator import generate_images, preload_model
-from utils.audio_generator import generate_audio, get_available_voices
-from utils.video_creator import create_video, create_video_with_transitions
+from utils.text_processing import (
+    split_text_into_scenes,
+    generate_scene_descriptions,
+    generate_prompts,
+    generate_negative_prompts,
+)
+from utils.image_generation import get_pipeline, generate_images_for_scenes
+from utils.audio_generation import generate_audio_for_scenes, get_available_voices
+from utils.video_creation import create_video
 import config
 
-# 配置日志
+# Cấu hình log
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# 创建Flask应用
+# Tạo ứng dụng Flask
 app = Flask(__name__)
 app.config['SECRET_KEY'] = config.SECRET_KEY
-app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10MB上传限制
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # Giới hạn tải lên 10MB
 CORS(app)
 
-# 全局任务字典，用于跟踪任务状态
+# Từ điển tác vụ toàn cục, dùng để theo dõi trạng thái tác vụ
 tasks = {}
 
-# 确保输出目录存在
+# Đảm bảo các thư mục đầu ra tồn tại
 os.makedirs(config.UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(config.OUTPUT_FOLDER, exist_ok=True)
 os.makedirs(config.STATIC_FOLDER, exist_ok=True)
 os.makedirs(config.TEMPLATE_FOLDER, exist_ok=True)
 
-# 在后台线程中预加载模型
-threading.Thread(target=preload_model, daemon=True).start()
+# Nạp trước mô hình Stable Diffusion trong luồng nền (lần đầu sẽ tải ~4GB)
+threading.Thread(target=get_pipeline, daemon=True).start()
 
-# 主页路由
+# Route trang chủ
 @app.route('/')
 def index():
-    # 获取可用的语音列表
+    # Lấy danh sách giọng nói khả dụng
     voices = get_available_voices()
-    # 获取可用的漫画风格
+    # Lấy các phong cách truyện tranh khả dụng
     styles = config.COMIC_STYLES
     return render_template('index.html', voices=voices, styles=styles)
 
-# 关于页面
-@app.route('/about')
-def about():
-    return render_template('about.html')
+# Cung cấp quyền truy cập tệp video đầu ra
+@app.route('/outputs/<path:filename>')
+def serve_output(filename):
+    return send_from_directory(config.OUTPUT_FOLDER, filename)
 
-# API路由 - 生成漫画视频
+# Route API - tạo video truyện tranh
 @app.route('/api/generate', methods=['POST'])
 def generate():
     try:
-        # 获取请求数据
+        # Lấy dữ liệu yêu cầu
         data = request.json
         text = data.get('text', '')
         style = data.get('style', 'default')
         voice = data.get('voice', config.DEFAULT_VOICE)
-        use_transitions = data.get('use_transitions', True)  # 是否使用过渡效果
-        add_background_music = data.get('add_background_music', False)  # 是否添加背景音乐
-        
-        # 验证输入
+        use_transitions = data.get('use_transitions', True)  # Có dùng hiệu ứng chuyển cảnh hay không
+        add_background_music = data.get('add_background_music', False)  # Có thêm nhạc nền hay không
+
+        # Kiểm tra đầu vào
         if not text:
-            return jsonify({'error': '请提供文本内容'}), 400
-        
+            return jsonify({'error': 'Vui lòng cung cấp nội dung văn bản'}), 400
+
         if len(text) > config.MAX_TEXT_LENGTH:
-            return jsonify({'error': f'文本长度超过限制（{config.MAX_TEXT_LENGTH}字）'}), 400
-        
-        # 生成任务ID
+            return jsonify({'error': f'Độ dài văn bản vượt quá giới hạn ({config.MAX_TEXT_LENGTH} ký tự)'}), 400
+
+        # Tạo ID tác vụ
         task_id = str(uuid.uuid4())
-        
-        # 创建任务输出目录
+
+        # Tạo thư mục đầu ra cho tác vụ
         task_output_folder = os.path.join(config.OUTPUT_FOLDER, task_id)
         os.makedirs(task_output_folder, exist_ok=True)
-        
-        # 初始化任务状态
+
+        # Khởi tạo trạng thái tác vụ
         tasks[task_id] = {
             'status': 'processing',
             'progress': 0,
             'start_time': time.time(),
             'output_folder': task_output_folder,
-            'text': text[:100] + '...' if len(text) > 100 else text,  # 存储截断的文本用于历史记录
+            'text': text[:100] + '...' if len(text) > 100 else text,  # Lưu văn bản đã cắt ngắn để ghi lịch sử
             'style': style
         }
-        
-        # 在会话中保存最近的任务ID
+
+        # Lưu ID tác vụ gần đây trong phiên
         if 'recent_tasks' not in session:
             session['recent_tasks'] = []
-        
+
         recent_tasks = session['recent_tasks']
         if task_id not in recent_tasks:
             recent_tasks.insert(0, task_id)
-        
-        # 只保留最近的10个任务
+
+        # Chỉ giữ lại 10 tác vụ gần nhất
         session['recent_tasks'] = recent_tasks[:10]
-        
-        # 启动后台处理线程
+
+        # Khởi động luồng xử lý nền
         threading.Thread(target=process_task, args=(task_id, text, style, voice, use_transitions, add_background_music)).start()
-        
-        # 返回任务ID
+
+        # Trả về ID tác vụ
         return jsonify({
             'task_id': task_id,
             'status': 'processing'
         })
-        
+
     except Exception as e:
-        logger.error(f"处理失败: {str(e)}")
+        logger.error(f"Xử lý thất bại: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-# 后台处理任务
+# Tác vụ xử lý nền
 def process_task(task_id, text, style, voice, use_transitions=True, add_background_music=False):
     try:
         task_output_folder = tasks[task_id]['output_folder']
-        
-        # 处理文本
-        logger.info(f"处理文本，任务ID: {task_id}")
-        segments = process_text(text)
+
+        # Xử lý văn bản - phân tách thành các cảnh
+        logger.info(f"Xử lý văn bản, ID tác vụ: {task_id}")
+        scenes = split_text_into_scenes(text, max_scenes=config.MAX_SCENES)
+        descriptions = generate_scene_descriptions(scenes)
         tasks[task_id]['progress'] = 10
-        
-        # 生成提示词
-        logger.info(f"生成提示词，任务ID: {task_id}")
-        prompts = generate_prompts(segments, style)
+
+        # Tạo prompt
+        logger.info(f"Tạo prompt, ID tác vụ: {task_id}")
+        prompts = generate_prompts(descriptions, style)
+        negative_prompt = generate_negative_prompts(style)
         tasks[task_id]['progress'] = 20
-        
-        # 生成图像
-        logger.info(f"生成图像，任务ID: {task_id}")
-        image_paths = generate_images(prompts, task_output_folder)
+
+        # Tạo hình ảnh
+        logger.info(f"Tạo hình ảnh, ID tác vụ: {task_id}")
+        image_paths = generate_images_for_scenes(prompts, negative_prompt, task_output_folder, style)
         tasks[task_id]['progress'] = 60
-        
-        # 生成音频
-        logger.info(f"生成音频，任务ID: {task_id}")
-        audio_data = generate_audio(segments, voice, task_output_folder)
+
+        # Tạo âm thanh
+        logger.info(f"Tạo âm thanh, ID tác vụ: {task_id}")
+        audio_paths = generate_audio_for_scenes(scenes, task_output_folder, voice)
         tasks[task_id]['progress'] = 80
-        
-        # 创建视频
-        logger.info(f"创建视频，任务ID: {task_id}")
-        if use_transitions:
-            video_path = create_video_with_transitions(image_paths, audio_data, segments, task_output_folder, add_background_music)
-        else:
-            video_path = create_video(image_paths, audio_data, segments, task_output_folder, add_background_music)
-        
+
+        # Tạo video
+        logger.info(f"Tạo video, ID tác vụ: {task_id}")
+        output_path = os.path.join(task_output_folder, 'output.mp4')
+        video_path = create_video(
+            image_paths,
+            audio_paths,
+            output_path,
+            use_transitions=use_transitions,
+            add_background_music=add_background_music,
+        )
+
         if not video_path:
             tasks[task_id]['status'] = 'failed'
-            tasks[task_id]['error'] = '视频生成失败'
+            tasks[task_id]['error'] = 'Tạo video thất bại'
             return
-        
-        # 更新任务状态
+
+        # Cập nhật trạng thái tác vụ
         tasks[task_id]['status'] = 'completed'
         tasks[task_id]['progress'] = 100
         tasks[task_id]['video_url'] = f'/outputs/{task_id}/output.mp4'
         tasks[task_id]['completion_time'] = time.time()
-        
+
     except Exception as e:
-        logger.error(f"任务处理失败: {str(e)}")
+        logger.error(f"Xử lý tác vụ thất bại: {str(e)}")
         tasks[task_id]['status'] = 'failed'
         tasks[task_id]['error'] = str(e)
 
-# API路由 - 获取任务状态
+# Route API - lấy trạng thái tác vụ
 @app.route('/api/status/<task_id>', methods=['GET'])
 def get_task_status(task_id):
     if task_id not in tasks:
-        return jsonify({'error': '任务不存在'}), 404
+        return jsonify({'error': 'Tác vụ không tồn tại'}), 404
     
     task = tasks[task_id]
     response = {
@@ -172,14 +183,14 @@ def get_task_status(task_id):
     if task['status'] == 'completed':
         response['video_url'] = task['video_url']
     elif task['status'] == 'failed':
-        response['error'] = task.get('error', '未知错误')
-    
+        response['error'] = task.get('error', 'Lỗi không xác định')
+
     return jsonify(response)
 
-# API路由 - 获取历史任务
+# Route API - lấy các tác vụ trong lịch sử
 @app.route('/api/history', methods=['GET'])
 def get_history():
-    # 获取最近的10个任务
+    # Lấy 10 tác vụ gần nhất
     recent_tasks = []
     for task_id, task in sorted(tasks.items(), key=lambda x: x[1].get('start_time', 0), reverse=True)[:10]:
         recent_tasks.append({
@@ -193,44 +204,34 @@ def get_history():
     
     return jsonify(recent_tasks)
 
-# API路由 - 获取可用语音
+# Route API - lấy các giọng nói khả dụng
 @app.route('/api/voices', methods=['GET'])
 def get_voices():
     voices = get_available_voices()
-    return jsonify(voices)
+    return jsonify({'voices': voices})
 
-# 清理旧任务
+# Dọn dẹp các tác vụ cũ
 def cleanup_tasks():
-    # 随机触发清理，避免每次请求都检查
-    if random.random() < 0.01:  # 1%的概率触发清理
+    # Kích hoạt dọn dẹp ngẫu nhiên, tránh kiểm tra ở mỗi lần yêu cầu
+    if random.random() < 0.01:  # Xác suất 1% kích hoạt dọn dẹp
         current_time = time.time()
         to_remove = []
-        
+
         for task_id, task in tasks.items():
-            # 清理超过24小时的任务
-            if current_time - task.get('start_time', current_time) > 86400:  # 24小时 = 86400秒
+            # Dọn dẹp các tác vụ quá 24 giờ
+            if current_time - task.get('start_time', current_time) > 86400:  # 24 giờ = 86400 giây
                 to_remove.append(task_id)
-                # 删除任务输出目录
+                # Xoá thư mục đầu ra của tác vụ
                 task_output_folder = task.get('output_folder')
                 if task_output_folder and os.path.exists(task_output_folder):
                     try:
                         shutil.rmtree(task_output_folder)
                     except Exception as e:
-                        logger.error(f"删除任务目录失败: {str(e)}")
-        
-        # 从任务字典中移除
+                        logger.error(f"Xoá thư mục tác vụ thất bại: {str(e)}")
+
+        # Xoá khỏi từ điển tác vụ
         for task_id in to_remove:
             tasks.pop(task_id, None)
-
-# 生成提示词函数
-def generate_prompts(segments, style):
-    prompts = []
-    for segment in segments:
-        # 根据文本内容生成提示词
-        # 这里可以接入更复杂的提示词生成逻辑，如使用OpenAI API
-        prompt = segment
-        prompts.append(prompt)
-    return prompts
 
 if __name__ == '__main__':
     app.run(debug=config.DEBUG, host=config.HOST, port=config.PORT)

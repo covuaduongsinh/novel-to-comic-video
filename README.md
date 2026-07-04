@@ -1,32 +1,32 @@
-# 小说转漫画视频生成器
+# Trình tạo video truyện tranh từ tiểu thuyết
 
-一个将小说文本转换为漫画视频的Web应用，支持多种漫画风格、AI配音和背景音乐。
+Một ứng dụng web chuyển văn bản tiểu thuyết thành video truyện tranh, hỗ trợ nhiều phong cách truyện tranh, lồng tiếng AI và nhạc nền.
 
-## 功能特点
+## Tính năng nổi bật
 
-- **文本转漫画**：输入小说文本，自动转换为漫画风格的图像，支持多种风格选择
-- **漫画视频生成**：将生成的漫画图像合成为视频，添加平滑过渡效果，提升观看体验
-- **智能配音**：为视频添加AI配音，支持多种声音选择，增强视听体验
-- **背景音乐**：可选择添加背景音乐，提升视频质量
-- **多种风格**：支持默认漫画风格、动漫风格、写实风格、水彩风格和素描风格
+- **Văn bản thành truyện tranh**: Nhập văn bản tiểu thuyết, tự động chuyển thành hình ảnh phong cách truyện tranh, hỗ trợ chọn nhiều phong cách
+- **Tạo video truyện tranh**: Ghép các hình ảnh truyện tranh đã tạo thành video, thêm hiệu ứng chuyển cảnh mượt mà, nâng cao trải nghiệm xem
+- **Lồng tiếng thông minh**: Thêm lồng tiếng AI cho video, hỗ trợ chọn nhiều giọng nói, tăng cường trải nghiệm nghe nhìn
+- **Nhạc nền**: Tùy chọn thêm nhạc nền, nâng cao chất lượng video
+- **Nhiều phong cách**: Hỗ trợ phong cách truyện tranh mặc định, phong cách anime, phong cách tả thực, phong cách màu nước và phong cách ký hoạ
 
-## 技术栈
+## Công nghệ sử dụng
 
-- **后端**：Flask (Python)
-- **前端**：HTML, CSS, JavaScript, Bootstrap
-- **图像生成**：Stable Diffusion
-- **语音合成**：Azure TTS
-- **视频处理**：MoviePy
+- **Backend**: Flask (Python)
+- **Frontend**: HTML, CSS, JavaScript, Bootstrap
+- **Tạo hình ảnh**: Stable Diffusion
+- **Tổng hợp giọng nói**: Vbee TTS
+- **Xử lý video**: MoviePy
 
-## 安装与使用
+## Cài đặt và sử dụng
 
-1. 克隆仓库
+1. Sao chép kho mã
 ```bash
 git clone https://github.com/shen158598/novel-to-comic-video.git
 cd novel-to-comic-video
 ```
 
-2. 运行应用
+2. Chạy ứng dụng
 ```bash
 # Windows
 run.bat
@@ -35,16 +35,16 @@ run.bat
 bash run.sh
 ```
 
-3. 打开浏览器访问 http://localhost:5000
+3. Mở trình duyệt và truy cập http://localhost:5000
 
-## 配置
+## Cấu hình
 
-在使用前，请确保配置以下内容：
+Trước khi sử dụng, vui lòng đảm bảo cấu hình các nội dung sau:
 
-1. 创建 `.env` 文件（参考 `.env.example`）
-2. 配置 API 密钥（OpenAI、Azure TTS 等）
-3. 下载背景音乐文件并放置在 `static/audio/background.mp3`
+1. Tạo tệp `.env` (tham khảo `.env.example`)
+2. Cấu hình khoá API (Vbee TTS, Hugging Face, v.v.)
+3. Tải tệp nhạc nền và đặt vào `static/audio/background.mp3`
 
-## 许可证
+## Giấy phép
 
 MIT

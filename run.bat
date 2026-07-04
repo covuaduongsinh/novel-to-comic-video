@@ -1,27 +1,27 @@
 @echo off
-echo 正在启动小说转漫画应用...
+echo Dang khoi dong ung dung chuyen tieu thuyet thanh truyen tranh...
 
-:: 检查Python是否安装
+:: Kiem tra Python da cai dat chua
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo Python未安装，请先安装Python 3.8-3.10
+    echo Python chua duoc cai dat, vui long cai Python 3.8-3.10 truoc
     pause
     exit /b
 )
 
-:: 检查是否已安装依赖
+:: Kiem tra da cai dat phu thuoc chua
 if not exist venv (
-    echo 首次运行，正在创建虚拟环境...
+    echo Chay lan dau, dang tao moi truong ao...
     python -m venv venv
     call venv\Scripts\activate
-    echo 正在安装依赖...
+    echo Dang cai dat phu thuoc...
     pip install -r requirements.txt
 ) else (
     call venv\Scripts\activate
 )
 
-:: 启动应用
-echo 启动应用...
+:: Khoi dong ung dung
+echo Khoi dong ung dung...
 python app.py
 
 pause

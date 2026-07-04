@@ -1,10 +1,10 @@
 /**
- * 小说转漫画视频应用 - 前端交互脚本
+ * Ứng dụng chuyển tiểu thuyết thành video truyện tranh - Kịch bản tương tác giao diện
  */
 
-// 当文档加载完成后执行
+// Thực thi sau khi tài liệu tải xong
 document.addEventListener('DOMContentLoaded', function() {
-    // 获取DOM元素
+    // Lấy các phần tử DOM
     const generateForm = document.getElementById('generate-form');
     const storyInput = document.getElementById('story-text');
     const charCounter = document.getElementById('char-counter');
@@ -19,41 +19,41 @@ document.addEventListener('DOMContentLoaded', function() {
     const submitBtn = document.getElementById('submit-btn');
     const voiceSelect = document.getElementById('voice-select');
     
-    // 任务ID和轮询间隔
+    // ID tác vụ và khoảng thời gian thăm dò
     let taskId = null;
     let pollInterval = null;
-    const POLL_FREQUENCY = 3000; // 3秒
-    
-    // 初始化字符计数器
+    const POLL_FREQUENCY = 3000; // 3 giây
+
+    // Khởi tạo bộ đếm ký tự
     updateCharCounter();
-    
-    // 监听文本输入，更新字符计数
+
+    // Lắng nghe nhập văn bản, cập nhật số ký tự
     storyInput.addEventListener('input', updateCharCounter);
-    
-    // 监听表单提交
+
+    // Lắng nghe gửi biểu mẫu
     generateForm.addEventListener('submit', function(e) {
         e.preventDefault();
         submitGeneration();
     });
-    
-    // 监听新建生成按钮
+
+    // Lắng nghe nút tạo mới
     if (newGenerationBtn) {
         newGenerationBtn.addEventListener('click', resetForm);
     }
-    
-    // 加载可用的语音列表
+
+    // Tải danh sách giọng nói khả dụng
     loadVoices();
-    
+
     /**
-     * 更新字符计数器
+     * Cập nhật bộ đếm ký tự
      */
     function updateCharCounter() {
         const currentLength = storyInput.value.length;
         const remaining = maxChars - currentLength;
-        
-        charCounter.textContent = `${currentLength}/${maxChars} 字符`;
-        
-        // 根据剩余字符数更新样式
+
+        charCounter.textContent = `${currentLength}/${maxChars} ký tự`;
+
+        // Cập nhật kiểu theo số ký tự còn lại
         charCounter.className = 'char-counter';
         if (remaining < maxChars * 0.2) {
             charCounter.classList.add('warning');
@@ -64,31 +64,31 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     /**
-     * 提交生成请求
+     * Gửi yêu cầu tạo video
      */
     function submitGeneration() {
-        // 获取表单数据
+        // Lấy dữ liệu biểu mẫu
         const formData = new FormData(generateForm);
         const storyText = formData.get('story_text');
-        
-        // 验证输入
+
+        // Kiểm tra đầu vào
         if (!storyText || storyText.trim().length < 10) {
-            showAlert('请输入至少10个字符的故事文本', 'danger');
+            showAlert('Vui lòng nhập văn bản câu chuyện ít nhất 10 ký tự', 'danger');
             return;
         }
-        
-        // 禁用提交按钮，显示加载状态
+
+        // Vô hiệu hoá nút gửi, hiển thị trạng thái đang tải
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span class="loading-spinner"></span> 处理中...';
-        
-        // 显示进度条，初始化为0%
+        submitBtn.innerHTML = '<span class="loading-spinner"></span> Đang xử lý...';
+
+        // Hiển thị thanh tiến độ, khởi tạo ở 0%
         progressContainer.style.display = 'block';
-        updateProgress(0, '正在初始化...');
-        
-        // 隐藏结果区域
+        updateProgress(0, 'Đang khởi tạo...');
+
+        // Ẩn khu vực kết quả
         resultContainer.style.display = 'none';
-        
-        // 发送API请求
+
+        // Gửi yêu cầu API
         axios.post('/api/generate', {
             story_text: storyText,
             comic_style: formData.get('comic_style') || 'default',
@@ -97,14 +97,14 @@ document.addEventListener('DOMContentLoaded', function() {
             add_background_music: formData.get('add_background_music') === 'on'
         })
         .then(function(response) {
-            // 保存任务ID并开始轮询状态
+            // Lưu ID tác vụ và bắt đầu thăm dò trạng thái
             taskId = response.data.task_id;
             startPolling();
         })
         .catch(function(error) {
-            // 处理错误
-            console.error('生成请求失败:', error);
-            let errorMessage = '生成请求失败';
+            // Xử lý lỗi
+            console.error('Gửi yêu cầu tạo video thất bại:', error);
+            let errorMessage = 'Gửi yêu cầu tạo video thất bại';
             if (error.response && error.response.data && error.response.data.error) {
                 errorMessage = error.response.data.error;
             }
@@ -112,63 +112,63 @@ document.addEventListener('DOMContentLoaded', function() {
             resetSubmitButton();
         });
     }
-    
+
     /**
-     * 开始轮询任务状态
+     * Bắt đầu thăm dò trạng thái tác vụ
      */
     function startPolling() {
-        // 清除可能存在的轮询
+        // Xoá thăm dò có thể đang tồn tại
         if (pollInterval) {
             clearInterval(pollInterval);
         }
-        
-        // 设置新的轮询
+
+        // Thiết lập thăm dò mới
         pollInterval = setInterval(function() {
             checkTaskStatus();
         }, POLL_FREQUENCY);
-        
-        // 立即检查一次状态
+
+        // Kiểm tra trạng thái ngay một lần
         checkTaskStatus();
     }
-    
+
     /**
-     * 检查任务状态
+     * Kiểm tra trạng thái tác vụ
      */
     function checkTaskStatus() {
         if (!taskId) return;
-        
+
         axios.get(`/api/status/${taskId}`)
             .then(function(response) {
                 const data = response.data;
-                
-                // 更新进度
+
+                // Cập nhật tiến độ
                 updateProgress(data.progress, data.status);
-                
-                // 如果任务完成
+
+                // Nếu tác vụ hoàn thành
                 if (data.state === 'completed') {
                     stopPolling();
                     showResult(data.result);
                     resetSubmitButton();
                 }
-                // 如果任务失败
+                // Nếu tác vụ thất bại
                 else if (data.state === 'failed') {
                     stopPolling();
-                    showAlert(`生成失败: ${data.error || '未知错误'}`, 'danger');
+                    showAlert(`Tạo video thất bại: ${data.error || 'Lỗi không xác định'}`, 'danger');
                     resetSubmitButton();
                 }
             })
             .catch(function(error) {
-                console.error('状态检查失败:', error);
-                // 如果连续几次检查失败，可以停止轮询
-                // 这里简化处理，直接停止
+                console.error('Kiểm tra trạng thái thất bại:', error);
+                // Nếu kiểm tra thất bại liên tiếp nhiều lần, có thể dừng thăm dò
+                // Ở đây xử lý đơn giản, dừng luôn
                 stopPolling();
-                showAlert('无法获取任务状态', 'warning');
+                showAlert('Không thể lấy trạng thái tác vụ', 'warning');
                 resetSubmitButton();
             });
     }
-    
+
     /**
-     * 停止轮询
+     * Dừng thăm dò
      */
     function stopPolling() {
         if (pollInterval) {
@@ -178,144 +178,144 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     /**
-     * 更新进度条
+     * Cập nhật thanh tiến độ
      */
     function updateProgress(percent, statusText) {
-        // 确保百分比在0-100之间
+        // Đảm bảo phần trăm nằm trong khoảng 0-100
         percent = Math.min(100, Math.max(0, percent));
-        
-        // 更新进度条
+
+        // Cập nhật thanh tiến độ
         progressBar.style.width = `${percent}%`;
         progressBar.setAttribute('aria-valuenow', percent);
-        
-        // 更新状态文本
+
+        // Cập nhật văn bản trạng thái
         if (statusText) {
             progressText.textContent = `${statusText} (${Math.round(percent)}%)`;
         } else {
             progressText.textContent = `${Math.round(percent)}%`;
         }
     }
-    
+
     /**
-     * 显示结果
+     * Hiển thị kết quả
      */
     function showResult(result) {
         if (!result || !result.video_url) {
-            showAlert('生成结果无效', 'danger');
+            showAlert('Kết quả tạo video không hợp lệ', 'danger');
             return;
         }
-        
-        // 显示结果容器
+
+        // Hiển thị vùng chứa kết quả
         resultContainer.style.display = 'block';
         resultContainer.classList.add('fade-in');
-        
-        // 设置视频播放器
+
+        // Thiết lập trình phát video
         videoPlayer.src = result.video_url;
         videoPlayer.poster = result.thumbnail_url || '';
         videoPlayer.load();
-        
-        // 设置下载链接
+
+        // Thiết lập liên kết tải xuống
         if (downloadBtn) {
             downloadBtn.href = result.video_url;
             downloadBtn.download = result.filename || 'comic-video.mp4';
         }
-        
-        // 滚动到结果区域
+
+        // Cuộn đến khu vực kết quả
         resultContainer.scrollIntoView({ behavior: 'smooth' });
     }
-    
+
     /**
-     * 重置表单
+     * Đặt lại biểu mẫu
      */
     function resetForm() {
-        // 停止任何正在进行的轮询
+        // Dừng mọi thăm dò đang diễn ra
         stopPolling();
-        
-        // 重置表单
+
+        // Đặt lại biểu mẫu
         generateForm.reset();
-        
-        // 更新字符计数
+
+        // Cập nhật số ký tự
         updateCharCounter();
-        
-        // 重置提交按钮
+
+        // Đặt lại nút gửi
         resetSubmitButton();
-        
-        // 隐藏进度和结果
+
+        // Ẩn tiến độ và kết quả
         progressContainer.style.display = 'none';
         resultContainer.style.display = 'none';
-        
-        // 滚动到表单顶部
+
+        // Cuộn lên đầu biểu mẫu
         generateForm.scrollIntoView({ behavior: 'smooth' });
     }
-    
+
     /**
-     * 重置提交按钮状态
+     * Đặt lại trạng thái nút gửi
      */
     function resetSubmitButton() {
         submitBtn.disabled = false;
-        submitBtn.innerHTML = '生成漫画视频';
+        submitBtn.innerHTML = 'Tạo video truyện tranh';
     }
-    
+
     /**
-     * 显示警告/提示消息
+     * Hiển thị thông báo cảnh báo/nhắc nhở
      */
     function showAlert(message, type = 'info') {
-        // 创建警告元素
+        // Tạo phần tử cảnh báo
         const alertDiv = document.createElement('div');
         alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
         alertDiv.role = 'alert';
         alertDiv.innerHTML = `
             ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="关闭"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
         `;
-        
-        // 查找警告容器
+
+        // Tìm vùng chứa cảnh báo
         const alertContainer = document.getElementById('alert-container');
         if (alertContainer) {
-            // 添加到容器
+            // Thêm vào vùng chứa
             alertContainer.appendChild(alertDiv);
-            
-            // 5秒后自动关闭
+
+            // Tự động đóng sau 5 giây
             setTimeout(() => {
                 alertDiv.classList.remove('show');
                 setTimeout(() => alertDiv.remove(), 150);
             }, 5000);
         } else {
-            // 如果没有容器，使用控制台
+            // Nếu không có vùng chứa, dùng console
             console.log(`${type.toUpperCase()}: ${message}`);
         }
     }
-    
+
     /**
-     * 加载可用的语音列表
+     * Tải danh sách giọng nói khả dụng
      */
     function loadVoices() {
-        // 如果没有语音选择器，直接返回
+        // Nếu không có bộ chọn giọng nói thì trả về ngay
         if (!voiceSelect) return;
-        
-        // 显示加载中
-        voiceSelect.innerHTML = '<option value="">加载中...</option>';
-        
-        // 请求语音列表
+
+        // Hiển thị đang tải
+        voiceSelect.innerHTML = '<option value="">Đang tải...</option>';
+
+        // Yêu cầu danh sách giọng nói
         axios.get('/api/voices')
             .then(function(response) {
                 const voices = response.data.voices || [];
-                
-                // 如果没有语音，显示提示
+
+                // Nếu không có giọng nói, hiển thị thông báo
                 if (voices.length === 0) {
-                    voiceSelect.innerHTML = '<option value="">无可用语音</option>';
+                    voiceSelect.innerHTML = '<option value="">Không có giọng nói khả dụng</option>';
                     return;
                 }
-                
-                // 清空选择器
+
+                // Xoá bộ chọn
                 voiceSelect.innerHTML = '';
-                
-                // 添加语音选项
+
+                // Thêm các tuỳ chọn giọng nói
                 voices.forEach(voice => {
                     const option = document.createElement('option');
                     option.value = voice.name;
                     option.textContent = `${voice.display_name} (${voice.locale})`;
-                    // 如果是默认语音，设为选中
+                    // Nếu là giọng nói mặc định, đặt làm được chọn
                     if (voice.name === 'zh-CN-XiaoxiaoNeural') {
                         option.selected = true;
                     }
@@ -323,8 +323,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             })
             .catch(function(error) {
-                console.error('获取语音列表失败:', error);
-                voiceSelect.innerHTML = '<option value="zh-CN-XiaoxiaoNeural">小小 (中文)</option>';
+                console.error('Lấy danh sách giọng nói thất bại:', error);
+                voiceSelect.innerHTML = '<option value="zh-CN-XiaoxiaoNeural">Xiaoxiao (Tiếng Trung)</option>';
             });
     }
 });

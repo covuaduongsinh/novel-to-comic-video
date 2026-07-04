@@ -1,27 +1,27 @@
-# 背景音乐文件夹
+# Thư mục nhạc nền
 
-此目录用于存放背景音乐文件，用于视频生成时添加背景音乐。
+Thư mục này dùng để lưu trữ tệp nhạc nền, dùng để thêm nhạc nền khi tạo video.
 
-## 使用说明
+## Hướng dẫn sử dụng
 
-1. 请将您想要用作背景音乐的MP3文件放在此目录下
-2. 文件名应为 `background.mp3`
-3. 建议使用无版权或拥有合法使用权的音乐文件
-4. 音乐文件大小建议不超过10MB
-5. 音乐长度建议在1-3分钟之间
+1. Vui lòng đặt tệp MP3 bạn muốn dùng làm nhạc nền vào thư mục này
+2. Tên tệp phải là `background.mp3`
+3. Nên dùng tệp nhạc không bản quyền hoặc bạn có quyền sử dụng hợp pháp
+4. Kích thước tệp nhạc nên không vượt quá 10MB
+5. Độ dài nhạc nên trong khoảng 1-3 phút
 
-## 推荐音乐来源
+## Nguồn nhạc gợi ý
 
-以下是一些提供免费背景音乐的网站：
+Dưới đây là một số trang web cung cấp nhạc nền miễn phí:
 
 - Pixabay: https://pixabay.com/music/
 - Mixkit: https://mixkit.co/free-stock-music/
 - Free Music Archive: https://freemusicarchive.org/
 - Bensound: https://www.bensound.com/
 
-## 注意事项
+## Lưu ý
 
-- 请确保您有权使用所选音乐
-- 如果不放置背景音乐文件，系统将不会添加背景音乐
-- 支持的格式：MP3（推荐）、WAV
-- 如果您启用了背景音乐选项但没有提供音乐文件，系统会忽略该选项
+- Vui lòng đảm bảo bạn có quyền sử dụng nhạc đã chọn
+- Nếu không đặt tệp nhạc nền, hệ thống sẽ không thêm nhạc nền
+- Định dạng hỗ trợ: MP3 (khuyến nghị), WAV
+- Nếu bạn bật tuỳ chọn nhạc nền nhưng không cung cấp tệp nhạc, hệ thống sẽ bỏ qua tuỳ chọn này

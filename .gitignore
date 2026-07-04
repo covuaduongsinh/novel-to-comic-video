@@ -1,52 +1,52 @@
-# Python虚拟环境
+# Môi trường ảo Python
 venv/
 env/
 .env
 
-# Python缓存文件
+# Tệp bộ nhớ đệm Python
 __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
 
-# 日志文件
+# Tệp log
 *.log
 logs/
 
-# 临时文件和目录
+# Tệp và thư mục tạm
 tmp/
 temp/
 
-# 上传和输出文件
+# Tệp tải lên và đầu ra
 uploads/
 outputs/
 
-# 系统文件
+# Tệp hệ thống
 .DS_Store
 Thumbs.db
 
-# IDE配置文件
+# Tệp cấu hình IDE
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# 依赖缓存
+# Bộ nhớ đệm phụ thuộc
 .pip_cache/
 
-# 分发文件
+# Tệp phân phối
 dist/
 build/
 *.egg-info/
 
-# 测试覆盖率报告
+# Báo cáo độ phủ kiểm thử
 .coverage
 htmlcov/
 
-# 本地配置文件
+# Tệp cấu hình cục bộ
 config.local.py
 
-# 背景音乐文件（需要用户手动下载）
+# Tệp nhạc nền (người dùng cần tự tải xuống)
 static/audio/*.mp3
 static/audio/*.wav
 !static/audio/README.txt

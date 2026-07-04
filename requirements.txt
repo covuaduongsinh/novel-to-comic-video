@@ -1,32 +1,34 @@
-# Web框架
-flask==2.2.3
-flask-cors==3.0.10
+# Framework web (flask>=3 đi kèm werkzeug>=3, tránh lỗi import url_quote)
+flask>=3.0.0
+flask-cors>=4.0.0
 
-# 环境变量
+# Biến môi trường
 python-dotenv==1.0.0
 
-# 图像处理
-Pillow==9.5.0
-numpy==1.24.3
-diffusers==0.14.0
-transformers==4.28.1
-torch==2.0.0
-torchvision==0.15.1
-accelerators==0.1.0
+# Xử lý hình ảnh (Pillow<10 tương thích moviepy 1.0.3; numpy<2 tương thích ABI cũ)
+Pillow<10
+numpy<2
+# transformers 5.x sẽ khởi tạo sai CLIP text encoder của SD v1.5 (512 vs 768),
+# bắt buộc cố định ở 4.x, kèm theo diffusers/huggingface_hub phiên bản cũ.
+transformers==4.46.3
+diffusers==0.31.0
+huggingface_hub==0.26.5
+tokenizers==0.20.3
+accelerate>=0.26.0
+torch>=2.0.0
+torchvision>=0.15.0
 
-# 视频处理
+# Xử lý video
 moviepy==1.0.3
 ffmpeg-python==0.2.0
 
-# 音频处理
-azure-cognitiveservices-speech==1.28.0
+# Xử lý âm thanh
 pydub==0.25.1
 
-# 工具库
-tqdm==4.65.0
-requests==2.28.2
-pandas==2.0.1
+# Xử lý văn bản
+jieba>=0.42.1
+nltk>=3.8.1
 
-# 缓存和任务队列
-redis==4.5.4
-celery==5.2.7
+# Thư viện tiện ích
+tqdm>=4.65.0
+requests>=2.28.2

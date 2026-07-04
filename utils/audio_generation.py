@@ -1,193 +1,294 @@
 import os
+import re
 import time
-import azure.cognitiveservices.speech as speechsdk
-from config import AZURE_SPEECH_KEY, AZURE_SPEECH_REGION, DEFAULT_VOICE
+import tempfile
+import requests
+from config import VBEE_APP_ID, VBEE_ACCESS_TOKEN, DEFAULT_VOICE
 
-def generate_speech(text, output_path, voice_name=None, rate=0, pitch=0):
+# Điểm cuối API Vbee TTS
+VBEE_TTS_URL = "https://api.vbee.vn/v1/tts"
+VBEE_VOICES_URL = "https://vbee.vn/api/public/v1/voices"
+
+# Số ký tự tối đa mỗi yêu cầu cho giao diện đồng bộ Vbee (chừa chút dư, giới hạn chính thức là 300)
+MAX_CHARS_PER_REQUEST = 290
+
+
+def _get_headers():
+    """Xây dựng header xác thực cho API Vbee"""
+    return {
+        "Authorization": f"Bearer {VBEE_ACCESS_TOKEN}",
+        "App-Id": VBEE_APP_ID,
+        "Content-Type": "application/json",
+    }
+
+
+def _split_text_for_tts(text, max_chars=MAX_CHARS_PER_REQUEST):
     """
-    使用Azure语音服务生成语音
-    
+    Cắt văn bản theo ranh giới câu thành các đoạn không quá max_chars, dùng cho giao diện đồng bộ Vbee.
+
     Args:
-        text (str): 要转换为语音的文本
-        output_path (str): 输出音频文件路径
-        voice_name (str): 语音名称，默认使用配置中的DEFAULT_VOICE
-        rate (int): 语速调整，范围-100到100
-        pitch (int): 音调调整，范围-100到100
-        
+        text (str): Văn bản đầu vào
+        max_chars (int): Số ký tự tối đa mỗi đoạn
+
     Returns:
-        bool: 是否成功生成语音
+        list: Danh sách các đoạn văn bản
     """
-    # 检查API密钥是否配置
-    if not AZURE_SPEECH_KEY or not AZURE_SPEECH_REGION:
-        print("错误: 未配置Azure语音服务API密钥或区域")
+    text = text.strip()
+    if not text:
+        return []
+
+    # Nếu tổng thể không vượt giới hạn, trả về ngay
+    if len(text) <= max_chars:
+        return [text]
+
+    # Cắt theo dấu câu cuối câu tiếng Trung/tiếng Anh, giữ lại dấu câu
+    sentences = re.findall(r'[^。！？\.!?]+[。！？\.!?]?', text)
+    sentences = [s.strip() for s in sentences if s.strip()]
+
+    chunks = []
+    current = ""
+    for sentence in sentences:
+        # Bản thân một câu đã vượt giới hạn, cắt cứng thêm theo ký tự
+        if len(sentence) > max_chars:
+            if current:
+                chunks.append(current)
+                current = ""
+            for i in range(0, len(sentence), max_chars):
+                chunks.append(sentence[i:i + max_chars])
+            continue
+
+        # Cộng dồn theo kiểu tham lam cho đến khi gần chạm giới hạn
+        if len(current) + len(sentence) <= max_chars:
+            current += sentence
+        else:
+            if current:
+                chunks.append(current)
+            current = sentence
+
+    if current:
+        chunks.append(current)
+
+    return chunks
+
+
+def _synthesize_chunk(text, voice_name, speed=1.0):
+    """
+    Gọi giao diện đồng bộ Vbee để tổng hợp một đoạn văn bản, trả về dữ liệu byte MP3.
+
+    Args:
+        text (str): Đoạn văn bản (<= 290 ký tự)
+        voice_name (str): Mã giọng Vbee
+        speed (float): Tốc độ nói 0.25-1.9
+
+    Returns:
+        bytes or None: Thành công trả về byte MP3, thất bại trả về None
+    """
+    payload = {
+        "text": text,
+        "mode": "sync",
+        "voiceCode": voice_name,
+        "outputFormat": "mp3",
+        "bitrate": 128,
+        "speed": speed,
+    }
+
+    try:
+        response = requests.post(
+            VBEE_TTS_URL,
+            headers=_get_headers(),
+            json=payload,
+            timeout=60,
+        )
+    except Exception as e:
+        print(f"Yêu cầu Vbee thất bại: {e}")
+        return None
+
+    content_type = response.headers.get("Content-Type", "")
+
+    # Khi thành công trả về nhị phân âm thanh; khi thất bại trả về lỗi JSON
+    if response.status_code == 200 and "application/json" not in content_type:
+        return response.content
+
+    # Phân tích thông tin lỗi
+    try:
+        err = response.json()
+        print(f"Tổng hợp Vbee thất bại (HTTP {response.status_code}): {err}")
+    except Exception:
+        print(f"Tổng hợp Vbee thất bại (HTTP {response.status_code}): {response.text[:200]}")
+    return None
+
+
+def generate_speech(text, output_path, voice_name=None, speed=1.0):
+    """
+    Dùng dịch vụ giọng nói Vbee để tạo giọng nói (tự động chia đoạn và ghép nối).
+
+    Args:
+        text (str): Văn bản cần chuyển thành giọng nói
+        output_path (str): Đường dẫn tệp âm thanh đầu ra (.mp3)
+        voice_name (str): Mã giọng Vbee, mặc định dùng DEFAULT_VOICE trong cấu hình
+        speed (float): Điều chỉnh tốc độ nói, phạm vi 0.25-1.9
+
+    Returns:
+        bool: Có tạo giọng nói thành công hay không
+    """
+    # Kiểm tra thông tin xác thực
+    if not VBEE_APP_ID or not VBEE_ACCESS_TOKEN:
+        print("Lỗi: Chưa cấu hình Vbee APP_ID hoặc ACCESS_TOKEN")
         return False
-    
-    # 使用默认语音
+
     if voice_name is None:
         voice_name = DEFAULT_VOICE
-    
-    try:
-        # 确保输出目录存在
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        
-        # 创建语音配置
-        speech_config = speechsdk.SpeechConfig(
-            subscription=AZURE_SPEECH_KEY, 
-            region=AZURE_SPEECH_REGION
-        )
-        
-        # 设置语音
-        speech_config.speech_synthesis_voice_name = voice_name
-        
-        # 创建音频配置
-        audio_config = speechsdk.audio.AudioOutputConfig(filename=output_path)
-        
-        # 创建语音合成器
-        speech_synthesizer = speechsdk.SpeechSynthesizer(
-            speech_config=speech_config, 
-            audio_config=audio_config
-        )
-        
-        # 构建SSML以控制语速和音调
-        ssml = f"""
-        <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-CN">
-            <voice name="{voice_name}">
-                <prosody rate="{rate}%" pitch="{pitch}%">
-                    {text}
-                </prosody>
-            </voice>
-        </speak>
-        """
-        
-        # 合成语音
-        result = speech_synthesizer.speak_ssml_async(ssml).get()
-        
-        # 检查结果
-        if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
-            print(f"语音生成成功: {output_path}")
-            return True
-        elif result.reason == speechsdk.ResultReason.Canceled:
-            cancellation_details = result.cancellation_details
-            print(f"语音合成取消: {cancellation_details.reason}")
-            if cancellation_details.reason == speechsdk.CancellationReason.Error:
-                print(f"错误详情: {cancellation_details.error_details}")
-            return False
-    except Exception as e:
-        print(f"语音生成失败: {e}")
+
+    text = (text or "").strip()
+    if not text:
+        print("Cảnh báo: Văn bản rỗng, bỏ qua tổng hợp giọng nói")
         return False
+
+    # Đảm bảo thư mục đầu ra tồn tại
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    # Chia đoạn
+    chunks = _split_text_for_tts(text)
+
+    # Tổng hợp từng đoạn
+    chunk_bytes = []
+    for i, chunk in enumerate(chunks):
+        audio = _synthesize_chunk(chunk, voice_name, speed)
+        if audio is None:
+            print(f"Đoạn {i + 1}/{len(chunks)} tổng hợp thất bại")
+            return False
+        chunk_bytes.append(audio)
+        # Chờ nhẹ, tránh kích hoạt giới hạn tần suất
+        if len(chunks) > 1:
+            time.sleep(0.3)
+
+    # Nếu chỉ có một đoạn thì ghi tệp trực tiếp; nhiều đoạn thì ghép bằng pydub
+    try:
+        if len(chunk_bytes) == 1:
+            with open(output_path, "wb") as f:
+                f.write(chunk_bytes[0])
+        else:
+            from pydub import AudioSegment
+            combined = AudioSegment.empty()
+            tmp_files = []
+            try:
+                for audio in chunk_bytes:
+                    tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
+                    tmp.write(audio)
+                    tmp.close()
+                    tmp_files.append(tmp.name)
+                    combined += AudioSegment.from_file(tmp.name, format="mp3")
+                combined.export(output_path, format="mp3")
+            finally:
+                for p in tmp_files:
+                    try:
+                        os.remove(p)
+                    except OSError:
+                        pass
+        print(f"Tạo giọng nói thành công: {output_path}")
+        return True
+    except Exception as e:
+        print(f"Ghép/lưu âm thanh thất bại: {e}")
+        return False
+
 
 def generate_audio_for_scenes(scenes, output_dir, voice_name=None):
     """
-    为多个场景生成音频文件
-    
+    Tạo tệp âm thanh cho nhiều cảnh.
+
     Args:
-        scenes (list): 场景文本列表
-        output_dir (str): 输出目录
-        voice_name (str): 语音名称
-        
+        scenes (list): Danh sách văn bản các cảnh
+        output_dir (str): Thư mục đầu ra
+        voice_name (str): Mã giọng
+
     Returns:
-        list: 生成的音频文件路径列表
+        list: Danh sách đường dẫn tệp âm thanh đã tạo (phần tử thất bại là None)
     """
-    # 确保输出目录存在
     os.makedirs(output_dir, exist_ok=True)
-    
-    # 生成音频
+
     audio_paths = []
     for i, scene in enumerate(scenes):
-        # 构建输出路径
         audio_path = os.path.join(output_dir, f"scene_{i:03d}.mp3")
-        
-        # 生成语音
         success = generate_speech(
             text=scene,
             output_path=audio_path,
-            voice_name=voice_name
+            voice_name=voice_name,
         )
-        
+
         if success:
             audio_paths.append(audio_path)
-            print(f"生成音频 {i+1}/{len(scenes)}: {audio_path}")
+            print(f"Tạo âm thanh {i + 1}/{len(scenes)}: {audio_path}")
         else:
-            print(f"生成音频 {i+1}/{len(scenes)} 失败")
-            # 如果生成失败，添加一个空路径
+            print(f"Tạo âm thanh {i + 1}/{len(scenes)} thất bại")
             audio_paths.append(None)
-        
-        # 添加短暂延迟，避免API限制
-        time.sleep(0.5)
-    
+
     return audio_paths
+
+
+# Danh sách giọng dự phòng dùng khi không có thông tin xác thực hoặc giao diện lỗi
+_FALLBACK_VOICES = [
+    {"name": "hn_female_ngochuyen_full_48k-fhg", "display_name": "Ngọc Huyền (Nữ - Bắc)", "locale": "vi-VN", "gender": "female"},
+    {"name": "hn_male_manhdung_news_48k-fhg", "display_name": "Mạnh Dũng (Nam - Bắc)", "locale": "vi-VN", "gender": "male"},
+    {"name": "sg_female_lantrinh_vdts_48k-fhg", "display_name": "Lan Trinh (Nữ - Nam)", "locale": "vi-VN", "gender": "female"},
+    {"name": "hue_female_huonggiang_full_48k-fhg", "display_name": "Hương Giang (Nữ - Huế)", "locale": "vi-VN", "gender": "female"},
+]
+
 
 def get_available_voices():
     """
-    获取可用的语音列表
-    
+    Lấy danh sách giọng nói khả dụng của Vbee.
+
     Returns:
-        list: 语音信息列表
+        list: Danh sách thông tin giọng nói [{name, display_name, locale, gender}, ...]
     """
-    # 检查API密钥是否配置
-    if not AZURE_SPEECH_KEY or not AZURE_SPEECH_REGION:
-        print("错误: 未配置Azure语音服务API密钥或区域")
-        return []
-    
+    if not VBEE_APP_ID or not VBEE_ACCESS_TOKEN:
+        print("Cảnh báo: Chưa cấu hình thông tin xác thực Vbee, trả về danh sách giọng dự phòng")
+        return _FALLBACK_VOICES
+
     try:
-        # 创建语音配置
-        speech_config = speechsdk.SpeechConfig(
-            subscription=AZURE_SPEECH_KEY, 
-            region=AZURE_SPEECH_REGION
-        )
-        
-        # 创建语音合成器
-        speech_synthesizer = speechsdk.SpeechSynthesizer(
-            speech_config=speech_config, 
-            audio_config=None
-        )
-        
-        # 获取可用语音
-        result = speech_synthesizer.get_voices_async().get()
-        
-        # 检查结果
-        if result.reason == speechsdk.ResultReason.VoicesListRetrieved:
+        response = requests.get(VBEE_VOICES_URL, headers=_get_headers(), timeout=30)
+        data = response.json()
+
+        if response.status_code == 200 and data.get("status") == 1:
+            result = data.get("result", {})
             voices = []
-            for voice in result.voices:
-                # 只保留中文和英文语音
-                if voice.locale.startswith('zh-') or voice.locale.startswith('en-'):
-                    voices.append({
-                        'name': voice.name,
-                        'display_name': voice.short_name,
-                        'locale': voice.locale,
-                        'gender': voice.gender,
-                        'style': voice.style_list
-                    })
-            return voices
+            for v in result.get("voices", []):
+                voices.append({
+                    "name": v.get("code"),
+                    "display_name": v.get("name", v.get("code")),
+                    "locale": v.get("language_code", ""),
+                    "gender": v.get("gender", ""),
+                })
+            return voices if voices else _FALLBACK_VOICES
         else:
-            print(f"获取语音列表失败: {result.reason}")
-            return []
+            print(f"Lấy danh sách giọng thất bại: {data}")
+            return _FALLBACK_VOICES
     except Exception as e:
-        print(f"获取语音列表失败: {e}")
-        return []
+        print(f"Lấy danh sách giọng thất bại: {e}")
+        return _FALLBACK_VOICES
+
 
 def get_voice_duration(audio_path):
     """
-    获取音频文件的持续时间（秒）
-    
+    Lấy thời lượng của tệp âm thanh (giây).
+
     Args:
-        audio_path (str): 音频文件路径
-        
+        audio_path (str): Đường dẫn tệp âm thanh
+
     Returns:
-        float: 音频持续时间（秒）
+        float: Thời lượng âm thanh (giây)
     """
     try:
         from pydub import AudioSegment
         audio = AudioSegment.from_file(audio_path)
-        return len(audio) / 1000.0  # 毫秒转秒
+        return len(audio) / 1000.0  # Đổi mili giây sang giây
     except Exception as e:
-        print(f"获取音频持续时间失败: {e}")
-        # 如果无法获取，返回估计值（每个中文字符约0.3秒）
+        print(f"Lấy thời lượng âm thanh thất bại: {e}")
+        # Nếu không lấy được, trả về giá trị ước tính
         try:
             with open(audio_path, 'rb') as f:
-                # 简单估计MP3文件大小与时长的关系
                 file_size = len(f.read())
-                estimated_duration = file_size / 10000  # 粗略估计
-                return max(estimated_duration, 1.0)  # 至少1秒
-        except:
-            return 3.0  # 默认3秒
+                estimated_duration = file_size / 10000
+                return max(estimated_duration, 1.0)
+        except Exception:
+            return 3.0  # Mặc định 3 giây

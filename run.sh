@@ -1,23 +1,23 @@
 #!/bin/bash
-echo "正在启动小说转漫画应用..."
+echo "Đang khởi động ứng dụng chuyển tiểu thuyết thành truyện tranh..."
 
-# 检查Python是否安装
+# Kiểm tra Python đã cài đặt chưa
 if ! command -v python3 &> /dev/null; then
-    echo "Python未安装，请先安装Python 3.8-3.10"
+    echo "Python chưa được cài đặt, vui lòng cài Python 3.8-3.10 trước"
     exit 1
 fi
 
-# 检查是否已安装依赖
+# Kiểm tra đã cài đặt phụ thuộc chưa
 if [ ! -d "venv" ]; then
-    echo "首次运行，正在创建虚拟环境..."
+    echo "Chạy lần đầu, đang tạo môi trường ảo..."
     python3 -m venv venv
     source venv/bin/activate
-    echo "正在安装依赖..."
+    echo "Đang cài đặt phụ thuộc..."
     pip install -r requirements.txt
 else
     source venv/bin/activate
 fi
 
-# 启动应用
-echo "启动应用..."
+# Khởi động ứng dụng
+echo "Khởi động ứng dụng..."
 python app.py

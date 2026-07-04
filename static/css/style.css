@@ -1,4 +1,4 @@
-/* 小说转漫画视频应用样式 */
+/* Kiểu dáng ứng dụng chuyển tiểu thuyết thành video truyện tranh */
 
 :root {
     --primary-color: #6c5ce7;
@@ -16,13 +16,13 @@
 }
 
 body {
-    font-family: 'Nunito', 'Noto Sans SC', sans-serif;
+    font-family: 'Nunito', 'Segoe UI', system-ui, sans-serif;
     background-color: #f8f9fa;
     color: var(--dark-color);
     line-height: 1.6;
 }
 
-/* 标题样式 */
+/* Kiểu tiêu đề */
 .site-header {
     background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
     color: white;
@@ -45,7 +45,7 @@ body {
     margin: 0 auto;
 }
 
-/* 卡片样式 */
+/* Kiểu thẻ */
 .card {
     border: none;
     border-radius: var(--border-radius);
@@ -78,7 +78,7 @@ body {
     color: var(--primary-color);
 }
 
-/* 表单样式 */
+/* Kiểu biểu mẫu */
 .form-control {
     border-radius: var(--border-radius);
     padding: 0.75rem 1rem;
@@ -101,7 +101,7 @@ textarea.form-control {
     color: var(--dark-color);
 }
 
-/* 按钮样式 */
+/* Kiểu nút */
 .btn {
     border-radius: var(--border-radius);
     padding: 0.5rem 1.5rem;
@@ -144,7 +144,7 @@ textarea.form-control {
     transform: translateY(-2px);
 }
 
-/* 进度条样式 */
+/* Kiểu thanh tiến độ */
 .progress {
     height: 1rem;
     border-radius: var(--border-radius);
@@ -158,7 +158,7 @@ textarea.form-control {
     transition: width 0.6s ease;
 }
 
-/* 结果区域样式 */
+/* Kiểu khu vực kết quả */
 .result-container {
     display: none;
     margin-top: 2rem;
@@ -170,7 +170,7 @@ textarea.form-control {
 
 .video-container {
     position: relative;
-    padding-bottom: 56.25%; /* 16:9 比例 */
+    padding-bottom: 56.25%; /* Tỉ lệ 16:9 */
     height: 0;
     overflow: hidden;
     border-radius: var(--border-radius);
@@ -186,7 +186,7 @@ textarea.form-control {
     background-color: #000;
 }
 
-/* 字数统计样式 */
+/* Kiểu đếm số từ */
 .char-counter {
     font-size: 0.85rem;
     color: #6c757d;
@@ -202,7 +202,7 @@ textarea.form-control {
     color: var(--danger-color);
 }
 
-/* 加载动画 */
+/* Hoạt ảnh đang tải */
 .loading-spinner {
     display: inline-block;
     width: 2rem;
@@ -218,7 +218,7 @@ textarea.form-control {
     to { transform: rotate(360deg); }
 }
 
-/* 响应式调整 */
+/* Điều chỉnh đáp ứng */
 @media (max-width: 768px) {
     .site-title {
         font-size: 2rem;
@@ -238,7 +238,7 @@ textarea.form-control {
     }
 }
 
-/* 自定义开关样式 */
+/* Kiểu công tắc tuỳ chỉnh */
 .custom-switch .custom-control-label::before {
     width: 2.5rem;
     height: 1.25rem;
@@ -264,7 +264,7 @@ textarea.form-control {
     background-color: white;
 }
 
-/* 漫画风格选择器 */
+/* Bộ chọn phong cách truyện tranh */
 .style-selector {
     display: flex;
     flex-wrap: wrap;
@@ -308,7 +308,7 @@ textarea.form-control {
     font-size: 0.9rem;
 }
 
-/* 动画效果 */
+/* Hiệu ứng hoạt ảnh */
 @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -318,7 +318,7 @@ textarea.form-control {
     animation: fadeIn 0.5s ease-in-out;
 }
 
-/* 页脚样式 */
+/* Kiểu chân trang */
 footer {
     margin-top: 3rem;
     padding: 2rem 0;

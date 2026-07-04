@@ -3,7 +3,7 @@ import jieba
 import nltk
 from nltk.tokenize import sent_tokenize
 
-# 尝试下载nltk数据，如果已存在则跳过
+# Thử tải dữ liệu nltk, nếu đã tồn tại thì bỏ qua
 try:
     nltk.data.find('tokenizers/punkt')
 except LookupError:
@@ -11,43 +11,43 @@ except LookupError:
 
 def split_text_into_scenes(text, max_scenes=10):
     """
-    将输入文本分割成场景列表
-    
+    Phân tách văn bản đầu vào thành danh sách các cảnh
+
     Args:
-        text (str): 输入的文本内容
-        max_scenes (int): 最大场景数量
-        
+        text (str): Nội dung văn bản đầu vào
+        max_scenes (int): Số cảnh tối đa
+
     Returns:
-        list: 场景文本列表
+        list: Danh sách văn bản các cảnh
     """
-    # 移除多余空白字符
+    # Loại bỏ khoảng trắng thừa
     text = re.sub(r'\s+', ' ', text).strip()
-    
-    # 检测语言（简单判断是否为中文）
+
+    # Phát hiện ngôn ngữ (kiểm tra đơn giản xem có phải tiếng Trung không)
     is_chinese = bool(re.search(r'[\u4e00-\u9fff]', text))
     
     if is_chinese:
-        # 中文文本处理
-        # 按句号、问号、感叹号分割，保留标点
+        # Xử lý văn bản tiếng Trung
+        # Tách theo dấu chấm, dấu hỏi, dấu chấm than, giữ lại dấu câu
         sentences = re.findall(r'[^。！？]+[。！？]', text)
         if not sentences and text:
-            sentences = [text]  # 如果没有分割成功，则将整个文本作为一个句子
+            sentences = [text]  # Nếu tách không thành công thì xem toàn bộ văn bản là một câu
     else:
-        # 英文文本处理
+        # Xử lý văn bản tiếng Anh
         sentences = sent_tokenize(text)
-    
-    # 如果句子数量少于max_scenes，直接返回每个句子作为一个场景
+
+    # Nếu số câu ít hơn max_scenes, trả về mỗi câu là một cảnh
     if len(sentences) <= max_scenes:
         return sentences
-    
-    # 将句子合并为场景，尽量平均分配
+
+    # Gộp các câu thành cảnh, cố gắng phân bổ đều
     scenes = []
     sentences_per_scene = len(sentences) // max_scenes
     remainder = len(sentences) % max_scenes
     
     start_idx = 0
     for i in range(max_scenes):
-        # 为前remainder个场景多分配一个句子
+        # Phân bổ thêm một câu cho remainder cảnh đầu tiên
         end_idx = start_idx + sentences_per_scene + (1 if i < remainder else 0)
         scene = ' '.join(sentences[start_idx:end_idx])
         scenes.append(scene)
@@ -57,40 +57,40 @@ def split_text_into_scenes(text, max_scenes=10):
 
 def generate_scene_descriptions(scenes):
     """
-    为每个场景生成描述，用于图像生成
-    
+    Tạo mô tả cho từng cảnh, dùng để tạo hình ảnh
+
     Args:
-        scenes (list): 场景文本列表
-        
+        scenes (list): Danh sách văn bản các cảnh
+
     Returns:
-        list: 场景描述列表，用于图像生成
+        list: Danh sách mô tả cảnh, dùng để tạo hình ảnh
     """
     descriptions = []
-    
+
     for scene in scenes:
-        # 移除多余空白字符
+        # Loại bỏ khoảng trắng thừa
         scene = re.sub(r'\s+', ' ', scene).strip()
-        
-        # 检测语言
+
+        # Phát hiện ngôn ngữ
         is_chinese = bool(re.search(r'[\u4e00-\u9fff]', scene))
         
         if is_chinese:
-            # 中文场景处理
-            # 使用jieba提取关键词和短语
+            # Xử lý cảnh tiếng Trung
+            # Dùng jieba để trích xuất từ khoá và cụm từ
             words = jieba.cut(scene)
-            # 过滤掉停用词和标点符号
+            # Lọc bỏ từ dừng và dấu câu
             filtered_words = [w for w in words if len(w) > 1 and not re.match(r'[\W\d]+', w)]
-            
-            # 提取主要名词和动词作为描述
+
+            # Trích xuất danh từ và động từ chính làm mô tả
             if filtered_words:
-                # 简单提取前10个有意义的词
+                # Lấy đơn giản 10 từ có nghĩa đầu tiên
                 key_terms = filtered_words[:10]
                 description = scene if len(scene) < 100 else ' '.join(key_terms)
             else:
                 description = scene
         else:
-            # 英文场景处理
-            # 简化处理，直接使用原始场景文本
+            # Xử lý cảnh tiếng Anh
+            # Xử lý đơn giản, dùng trực tiếp văn bản cảnh gốc
             description = scene if len(scene) < 100 else scene[:100] + '...'
         
         descriptions.append(description)
@@ -99,16 +99,16 @@ def generate_scene_descriptions(scenes):
 
 def generate_prompts(scene_descriptions, style="default"):
     """
-    根据场景描述和风格生成图像生成提示词
-    
+    Tạo prompt tạo hình ảnh dựa trên mô tả cảnh và phong cách
+
     Args:
-        scene_descriptions (list): 场景描述列表
-        style (str): 漫画风格
-        
+        scene_descriptions (list): Danh sách mô tả cảnh
+        style (str): Phong cách truyện tranh
+
     Returns:
-        list: 提示词列表
+        list: Danh sách prompt
     """
-    # 风格提示词映射
+    # Ánh xạ prompt theo phong cách
     style_prompts = {
         'default': ', comic style, detailed, vibrant colors',
         'anime': ', anime style, manga, detailed, vibrant colors',
@@ -117,20 +117,20 @@ def generate_prompts(scene_descriptions, style="default"):
         'sketch': ', sketch style, pencil drawing, black and white'
     }
     
-    # 获取风格提示词，如果不存在则使用默认风格
+    # Lấy prompt phong cách, nếu không tồn tại thì dùng phong cách mặc định
     style_prompt = style_prompts.get(style, style_prompts['default'])
-    
-    # 为每个场景描述生成提示词
+
+    # Tạo prompt cho từng mô tả cảnh
     prompts = []
     for description in scene_descriptions:
-        # 检测语言
+        # Phát hiện ngôn ngữ
         is_chinese = bool(re.search(r'[\u4e00-\u9fff]', description))
         
         if is_chinese:
-            # 中文描述，添加英文翻译提示
+            # Mô tả tiếng Trung, thêm gợi ý dịch sang tiếng Anh
             prompt = f"scene from a story: {description}, illustration{style_prompt}"
         else:
-            # 英文描述
+            # Mô tả tiếng Anh
             prompt = f"scene from a story: {description}, illustration{style_prompt}"
         
         prompts.append(prompt)
@@ -139,15 +139,15 @@ def generate_prompts(scene_descriptions, style="default"):
 
 def generate_negative_prompts(style="default"):
     """
-    根据风格生成负面提示词
-    
+    Tạo prompt phủ định dựa trên phong cách
+
     Args:
-        style (str): 漫画风格
-        
+        style (str): Phong cách truyện tranh
+
     Returns:
-        str: 负面提示词
+        str: Prompt phủ định
     """
-    # 风格负面提示词映射
+    # Ánh xạ prompt phủ định theo phong cách
     style_negative_prompts = {
         'default': 'blurry, low quality, distorted, deformed',
         'anime': 'blurry, low quality, distorted, deformed, photorealistic',
@@ -156,10 +156,10 @@ def generate_negative_prompts(style="default"):
         'sketch': 'color, painting, digital art, blurry, low quality'
     }
     
-    # 获取风格负面提示词，如果不存在则使用默认风格
+    # Lấy prompt phủ định theo phong cách, nếu không tồn tại thì dùng phong cách mặc định
     negative_prompt = style_negative_prompts.get(style, style_negative_prompts['default'])
-    
-    # 添加通用负面提示词
+
+    # Thêm prompt phủ định dùng chung
     common_negative = "text, watermark, signature, logo, nsfw, nude, bad anatomy, bad hands, extra fingers"
     
     return f"{negative_prompt}, {common_negative}"
